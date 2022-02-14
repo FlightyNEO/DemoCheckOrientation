@@ -21,10 +21,16 @@ struct ContentView: View {
                            title: "UIInterfaceOrientation",
                            text: $vm.interfaceOrientation)
             }
+            VStack {
+                Text("Device attitude degrees")
+                Text(vm.deviceAttitudeDegrees)
+                    .foregroundColor(.red)
+            }
         }
         .onAppear {
             vm.checkDeviceOrientation()
             vm.checkInterfaceOrientation()
+            vm.checkDeviceAttitudeDegrees()
         }
     }
 }
