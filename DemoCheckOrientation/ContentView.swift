@@ -27,11 +27,16 @@ struct ContentView: View {
                     .foregroundColor(.red)
             }
         }
-        .onAppear {
+        .onRotate { orientation in
             vm.checkDeviceOrientation()
             vm.checkInterfaceOrientation()
             vm.checkDeviceAttitudeDegrees()
         }
+//        .onAppear {
+//            vm.checkDeviceOrientation()
+//            vm.checkInterfaceOrientation()
+//            vm.checkDeviceAttitudeDegrees()
+//        }
     }
 }
 
@@ -54,5 +59,23 @@ struct CheckLabel: View {
             Text(text)
                 .foregroundColor(.red)
         }
+    }
+}
+
+struct DeviceRotationiewModifier: ViewModifier {
+    let action: (UIDeviceOrientation) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear()
+            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+                action(UIDevice.current.orientation)
+            }
+    }
+}
+
+extension View {
+    func onRotate(perform action: @escaping (UIDeviceOrientation) -> Void) -> some View {
+        self.modifier(DeviceRotationiewModifier(action: action))
     }
 }
