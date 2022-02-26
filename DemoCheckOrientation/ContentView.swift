@@ -9,34 +9,34 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject var vm = ViewModel()
+    @State var deviceOrientationTitle = ""
 
     var body: some View {
         VStack(spacing: 20) {
             Text("Check orientation").font(.title)
-            HStack(spacing: 20) {
-                CheckLabel(action: vm.checkDeviceOrientation,
-                           title: "UIDeviceOrientation",
-                           text: $vm.deviceOrientation)
+            VStack(spacing: 20) {
                 CheckLabel(action: vm.checkInterfaceOrientation,
-                           title: "UIInterfaceOrientation",
+                           title: "Interface orientation",
                            text: $vm.interfaceOrientation)
-            }
-            VStack {
-                Text("Device attitude degrees")
-                Text(vm.deviceAttitudeDegrees)
-                    .foregroundColor(.red)
+                Group {
+                    Text("Device orientation using Notification")
+                    Text(deviceOrientationTitle)
+                        .foregroundColor(.red)
+                }
+                Group {
+                    Text("Device orientation using Core Motion")
+                    Text(vm.deviceOrientationUsingCoreMotion)
+                        .foregroundColor(.red)
+                }
             }
         }
-        .onRotate { orientation in
-            vm.checkDeviceOrientation()
+        .onDeviceRotate { orientation in
+            deviceOrientationTitle = orientation.description
+        }
+        .onAppear {
+            vm.checkDeviceOrientationUsingCoreMotion()
             vm.checkInterfaceOrientation()
-            vm.checkDeviceAttitudeDegrees()
         }
-//        .onAppear {
-//            vm.checkDeviceOrientation()
-//            vm.checkInterfaceOrientation()
-//            vm.checkDeviceAttitudeDegrees()
-//        }
     }
 }
 
@@ -54,10 +54,8 @@ struct CheckLabel: View {
     var body: some View {
         VStack {
             Button("Check", action: action)
-                .padding(.bottom, 10)
             Text(title)
-            Text(text)
-                .foregroundColor(.red)
+            Text(text).foregroundColor(.red)
         }
     }
 }
@@ -75,7 +73,7 @@ struct DeviceRotationiewModifier: ViewModifier {
 }
 
 extension View {
-    func onRotate(perform action: @escaping (UIDeviceOrientation) -> Void) -> some View {
+    func onDeviceRotate(perform action: @escaping (UIDeviceOrientation) -> Void) -> some View {
         self.modifier(DeviceRotationiewModifier(action: action))
     }
 }

@@ -11,14 +11,9 @@ import CoreMotion
 final class ViewModel: ObservableObject {
     @Published var deviceOrientation = ""
     @Published var interfaceOrientation = ""
-    @Published var deviceAttitudeDegrees = ""
+    @Published var deviceOrientationUsingCoreMotion = ""
 
-    private let motionManager = CMMotionManager()
-    private let deviceMotionUpdatesOperationQueue: OperationQueue = {
-        let operationQueue = OperationQueue()
-        operationQueue.qualityOfService = .userInteractive
-        return operationQueue
-    }()
+    private let deviceMotionServiceRotation = DeviceMotionServiceRotation()
     
     func checkDeviceOrientation() {
         deviceOrientation = UIDevice.current.orientation.description
@@ -29,17 +24,9 @@ final class ViewModel: ObservableObject {
         interfaceOrientation = windowScene.interfaceOrientation.description
     }
 
-    func checkDeviceAttitudeDegrees() {
-        // The device-motion service is available if a device has both an accelerometer and a gyroscope.
-        // Because all devices have accelerometers, this property is functionally equivalent to isGyroAvailable.
-        guard motionManager.isDeviceMotionAvailable else {
-            deviceAttitudeDegrees = "Device motion unavailable"
-            return
-        }
-        motionManager.deviceMotionUpdateInterval = 0.1
-        motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { deviceMotion, error in
-            guard let deviceMotion = deviceMotion else { return }
-            self.deviceAttitudeDegrees = String(deviceMotion.attitude.roll * 180 / .pi)
+    func checkDeviceOrientationUsingCoreMotion() {
+        deviceMotionServiceRotation.startDeviceMotionService { [weak self] orientation in
+            self?.deviceOrientationUsingCoreMotion = orientation.description
         }
     }
 }
@@ -69,5 +56,54 @@ extension UIInterfaceOrientation: CustomStringConvertible {
         case .unknown: return "not determined"
         @unknown default: fatalError()
         }
+    }
+}
+
+class DeviceMotionServiceRotation {
+    private var motionManager: CMMotionManager?
+    private var timer: Timer?
+
+    deinit {
+        stopMotionUpdates()
+    }
+
+    func startDeviceMotionService(with handler: @escaping (_ orientation: UIInterfaceOrientation) -> Void) {
+        var currentOrientation: UIInterfaceOrientation = .landscapeRight {
+            didSet {
+                if currentOrientation != oldValue {
+                    handler(currentOrientation)
+                }
+            }
+        }
+
+        motionManager = CMMotionManager()
+        guard motionManager?.isDeviceMotionAvailable == true else { return assertionFailure() }
+        motionManager?.deviceMotionUpdateInterval = Constants.deviceMotionServiceTimeInterval
+        motionManager?.showsDeviceMovementDisplay = true
+        motionManager?.startDeviceMotionUpdates(using: .xMagneticNorthZVertical)
+
+        timer = Timer(fire: Date(), interval: Constants.deviceMotionServiceTimeInterval, repeats: true) { [weak self] _ in
+            switch self?.motionManager?.deviceMotion?.gravity.x {
+            case .some(let xAxis) where xAxis > Constants.minDeviceMaxXAxis: currentOrientation = .landscapeRight
+            case .some(let xAxis) where xAxis < Constants.minDeviceMinXAxis: currentOrientation = .landscapeLeft
+            case .some: currentOrientation = .portrait
+            case .none: return
+            }
+        }
+
+        RunLoop.current.add(timer!, forMode: RunLoop.Mode.default)
+    }
+
+    func stopMotionUpdates() {
+        timer?.invalidate()
+        motionManager?.stopDeviceMotionUpdates()
+    }
+}
+
+private extension DeviceMotionServiceRotation {
+    enum Constants {
+        static let minDeviceMaxXAxis: Double = 0.65
+        static let minDeviceMinXAxis: Double = -0.65
+        static let deviceMotionServiceTimeInterval: TimeInterval = 1.0 / 60.0
     }
 }
